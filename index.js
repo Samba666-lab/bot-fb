@@ -5,7 +5,7 @@ app.use(express.json());
 const MODEL = "gemini-3.1-flash-lite-preview";
 
 /* ================== ANTONTAN-KEVITRA (ovao eto) ================== */
-const WHATSAPP = process.env.WHATSAPP_NUMBER || "034 00 000 00"; // ← laharana WhatsApp marina
+const WHATSAPP = process.env.WHATSAPP_NUMBER || "038 99 293 26";
 const ADRESY = process.env.ADRESY || "Itaosy, Antananarivo";       // ← hamarino
 const RAKITRA_APP = "https://srzaitra-api.srzaitra.workers.dev/telecharger";
 
@@ -27,6 +27,7 @@ VIDINY (tena zava-dehibe)
 - AZA milaza vidiny mihitsy, na tombana aza, fa miankina amin'ny lamba, ny refy ary ny modely.
 - Rehefa manontany vidiny, fotoana (délai), na te hanafatra ny olona, dia omeo foana ny WhatsApp:
   "Mba hahazoana vidiny marina, alefaso amin'ny WhatsApp ${WHATSAPP} ny modely tianao (sary raha misy) sy ny daty ilanao azy."
+- Raha mangataka fihenam-bidy na miady varotra ("tsy tapakao ve?"), valio am-pitiavana fa ho resahina amin'ny WhatsApp ${WHATSAPP} izany.
 - Raha mbola tsy fantatra izay ilainy, anontanio fohy: inona no akanjo, ho an'iza, ho amin'ny oviana.
 
 APP SR-ZAITRA (ho an'ny tompon'atelier de couture)
@@ -99,21 +100,30 @@ async function reply(userId, text) {
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: SYSTEM }] },
           contents: getTurns(userId),
-          generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+          // Tsy ferana intsony ny maxOutputTokens: ny "thinking" an'ny Gemini 3
+          // no nandany azy rehetra, ka tsy nisy valiny intsony.
+          generationConfig: { temperature: 0.4, maxOutputTokens: 4096 },
         }),
       }
     );
     const data = await g.json();
     answer = data.candidates?.[0]?.content?.parts?.map(p => p.text || "").join("").trim();
-    if (!answer) console.error("Gemini error:", JSON.stringify(data).slice(0, 500));
+    if (!answer)
+      console.error("Gemini error:", data.candidates?.[0]?.finishReason,
+                    JSON.stringify(data).slice(0, 800));
   } catch (err) {
     console.error("Gemini fetch error:", err);
   }
 
   // Tsy aseho ny mpanjifa mihitsy ny erreur ara-teknika
-  if (!answer)
-    answer = `Miala tsiny, misy olana kely amin'izao fotoana izao. ` +
-             `Afaka manoratra aminay amin'ny WhatsApp ${WHATSAPP} ianao. 🙏`;
+  if (!answer) {
+    // Tsy tehirizina ao amin'ny tantara ny hafatra erreur, fa esorina ilay fanontaniana
+    // mba tsy hanimba ny resaka manaraka.
+    const h = history.get(userId); if (h) h.turns.pop();
+    return send(userId,
+      `Miala tsiny, tsy azoko tsara izany. Azonao averina ve, ` +
+      `na manorata aminay amin'ny WhatsApp ${WHATSAPP}. 🙏`);
+  }
 
   pushTurn(userId, "model", answer);
   await send(userId, answer);
@@ -144,4 +154,4 @@ async function typing(userId) {
 }
 
 app.listen(process.env.PORT || 3000);
-      
+                         
