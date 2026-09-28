@@ -2,6 +2,8 @@ import express from "express";
 const app = express();
 app.use(express.json());
 
+const MODEL = "gemini-3.1-flash-lite-preview";
+
 app.get("/webhook", (req, res) => {
   if (req.query["hub.verify_token"] === process.env.VERIFY_TOKEN)
     return res.send(req.query["hub.challenge"]);
@@ -18,7 +20,7 @@ app.post("/webhook", (req, res) => {
 
 async function reply(userId, text) {
   const g = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent",
+    `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`,
     {
       method: "POST",
       headers: {
@@ -34,9 +36,10 @@ async function reply(userId, text) {
     }
   );
   const data = await g.json();
+  if (!data.candidates) console.error("Gemini error:", JSON.stringify(data));
   const answer =
     data.candidates?.[0]?.content?.parts?.[0]?.text ||
-    "Miala tsiny, misy olana kely.";
+    "Erreur: " + JSON.stringify(data).slice(0, 300);
 
   await fetch(
     `https://graph.facebook.com/v21.0/me/messages?access_token=${process.env.PAGE_TOKEN}`,
